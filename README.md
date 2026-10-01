@@ -3,6 +3,7 @@
 Drop in an AI-generated image or video and see the prompt, settings, LoRAs and workflow that made it.
 
 **Use it online:** https://whistlepigow.github.io/ai-prompt-extractor/
+
 (_Works entirely in your browser. Your images and videos are never uploaded, even when using the online version._)
 
 **Or download it:** grab `AI_Image_Prompt_Extractor.html` from the [latest release](https://github.com/WhistlePigOW/ai-prompt-extractor/releases/latest), save it anywhere, and double-click it. It opens in your browser and works offline. Nothing to install.
