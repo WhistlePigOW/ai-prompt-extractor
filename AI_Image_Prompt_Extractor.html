@@ -1,0 +1,2110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Image Prompt Extractor</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #171717;
+    --panel: #222222;
+    --panel-2: #2b2b2b;
+    --panel-3: #333333;
+    --border: #444444;
+    --text: #f2f2f2;
+    --muted: #aaaaaa;
+    --accent: #c86c2b;
+    --accent-hover: #e07b36;
+    --accent-soft: rgba(200, 108, 43, 0.18);
+    --good: #7fb069;
+    --warn: #e0a458;
+    --bad: #d35d6e;
+    --shadow: 0 12px 28px rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at top right, rgba(200,108,43,.10), transparent 32rem),
+      var(--bg);
+    color: var(--text);
+  }
+
+  button, input, textarea { font: inherit; }
+
+  .app {
+    width: min(1500px, 100%);
+    min-height: 100vh;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    gap: 14px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .title-wrap h1 {
+    margin: 0;
+    font-size: clamp(1.35rem, 2.5vw, 2rem);
+    letter-spacing: .01em;
+  }
+
+  .title-wrap p {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: .94rem;
+  }
+
+  .privacy {
+    color: var(--good);
+    font-size: .85rem;
+    white-space: nowrap;
+  }
+
+  .drop-zone {
+    position: relative;
+    border: 2px dashed #5a5a5a;
+    background: linear-gradient(135deg, rgba(255,255,255,.025), rgba(200,108,43,.06));
+    border-radius: 14px;
+    padding: 18px;
+    min-height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    transition: .18s ease;
+    box-shadow: var(--shadow);
+  }
+
+  .drop-zone:hover,
+  .drop-zone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    transform: translateY(-1px);
+  }
+
+  .drop-zone strong { color: #fff; }
+  .drop-zone small {
+    display: block;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  #fileInput { display: none; }
+
+  .workspace {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .panel {
+    background: rgba(34,34,34,.96);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .sidebar {
+    min-height: 480px;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  .panel-header {
+    padding: 13px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .panel-header h2 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .count {
+    color: var(--muted);
+    font-size: .82rem;
+  }
+
+  .file-list {
+    overflow: auto;
+    padding: 8px;
+  }
+
+  .file-empty {
+    color: var(--muted);
+    padding: 24px 14px;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .file-item {
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    padding: 10px;
+    margin-bottom: 6px;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 10px;
+    align-items: center;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .file-item:hover { background: var(--panel-2); }
+  .file-item.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 7px;
+    object-fit: cover;
+    background: #111;
+    border: 1px solid #444;
+  }
+
+  .file-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 650;
+    font-size: .9rem;
+  }
+
+  .file-meta {
+    color: var(--muted);
+    font-size: .76rem;
+    margin-top: 3px;
+  }
+
+  .sidebar-footer {
+    padding: 10px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+  }
+
+  .main-panel {
+    min-width: 0;
+    min-height: 480px;
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+
+  .toolbar {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-2);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  button {
+    border: 1px solid #555;
+    background: var(--panel-3);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 11px;
+    cursor: pointer;
+    transition: .15s ease;
+  }
+
+  button:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: #3a302a;
+  }
+
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    font-weight: 700;
+  }
+
+  button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+  button:disabled { opacity: .42; cursor: not-allowed; }
+
+  .toolbar .spacer { flex: 1; }
+
+  .status {
+    font-size: .82rem;
+    color: var(--muted);
+  }
+
+  .status.good { color: var(--good); }
+  .status.warn { color: var(--warn); }
+  .status.bad { color: var(--bad); }
+
+  .content {
+    min-height: 0;
+    overflow: auto;
+    padding: 14px;
+  }
+
+  .welcome {
+    min-height: 380px;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .summary-card {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 11px;
+    min-width: 0;
+  }
+
+  .summary-card .label {
+    color: var(--muted);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+  }
+
+  .summary-card .value {
+    margin-top: 5px;
+    font-weight: 700;
+    word-break: break-word;
+  }
+
+  .section {
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    overflow: hidden;
+    background: #1d1d1d;
+  }
+
+  .section-title {
+    padding: 10px 12px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-weight: 700;
+  }
+
+  .section-body { padding: 11px; }
+
+  textarea,
+  pre {
+    width: 100%;
+    margin: 0;
+    border: 1px solid #484848;
+    border-radius: 8px;
+    background: #151515;
+    color: #f1f1f1;
+    padding: 10px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 110px;
+  }
+
+  pre {
+    max-height: 480px;
+    overflow: auto;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .82rem;
+  }
+
+  .kv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .88rem;
+  }
+
+  .kv-table th,
+  .kv-table td {
+    padding: 8px 9px;
+    border-bottom: 1px solid #393939;
+    text-align: left;
+    vertical-align: top;
+    word-break: break-word;
+  }
+
+  .kv-table th {
+    width: 190px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .kv-table tr:last-child th,
+  .kv-table tr:last-child td { border-bottom: 0; }
+
+  details summary {
+    cursor: pointer;
+    color: #f0c29d;
+    padding: 2px 0;
+  }
+
+  .pill {
+    display: inline-block;
+    border: 1px solid #555;
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: .75rem;
+    color: var(--muted);
+  }
+
+  .pill.accent {
+    color: #ffd6b9;
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .notice {
+    border-left: 4px solid var(--warn);
+    background: rgba(224,164,88,.08);
+    padding: 11px 12px;
+    border-radius: 7px;
+    color: #e4d3b7;
+    line-height: 1.5;
+  }
+
+  .hidden { display: none !important; }
+
+  @media (max-width: 850px) {
+    .app { padding: 12px; }
+    header { align-items: flex-start; flex-direction: column; }
+    .privacy { white-space: normal; }
+    .workspace { grid-template-columns: 1fr; }
+    .sidebar { min-height: 240px; max-height: 340px; }
+    .main-panel { min-height: 550px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="title-wrap">
+      <h1>AI Image Prompt Extractor</h1>
+      <p>Reads embedded generation metadata from PNG, JPEG, WebP, and MP4 / MOV / WebM / MKV video.</p>
+    </div>
+    <div class="privacy">● Runs locally — files never leave your browser</div>
+  </header>
+
+  <label class="drop-zone" id="dropZone">
+    <input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.webp,.mp4,.m4v,.mov,.webm,.mkv,image/png,image/jpeg,image/webp,video/mp4,video/quicktime,video/webm,video/x-matroska" multiple>
+    <div>
+      <strong>Drop one or more images or videos here</strong>
+      <small>or click to browse · ComfyUI, A1111/Forge, EXIF, XMP, and generic text metadata</small>
+    </div>
+  </label>
+
+  <div class="workspace">
+    <aside class="panel sidebar">
+      <div class="panel-header">
+        <h2>Files</h2>
+        <span class="count" id="fileCount">0 files</span>
+      </div>
+      <div class="file-list" id="fileList">
+        <div class="file-empty">No files loaded yet.</div>
+      </div>
+      <div class="sidebar-footer">
+        <button id="addFilesBtn">Add files</button>
+        <button id="clearBtn" disabled>Clear</button>
+      </div>
+    </aside>
+
+    <main class="panel main-panel">
+      <div class="toolbar">
+        <button class="primary" id="copyPromptBtn" disabled>Copy prompt</button>
+        <button id="copyAllBtn" disabled>Copy all</button>
+        <button id="exportTxtBtn" disabled>Export TXT</button>
+        <button id="exportJsonBtn" disabled>Export JSON</button>
+        <span class="spacer"></span>
+        <span class="status" id="statusText">Ready</span>
+      </div>
+      <div class="content" id="content">
+        <div class="welcome">
+          <div>
+            <strong>Load an AI-generated image or video to inspect it.</strong><br>
+            Exact prompts can only be recovered when the file still contains metadata.
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const state = {
+  items: [],
+  selectedIndex: -1
+};
+
+const els = {
+  dropZone: document.getElementById('dropZone'),
+  fileInput: document.getElementById('fileInput'),
+  addFilesBtn: document.getElementById('addFilesBtn'),
+  clearBtn: document.getElementById('clearBtn'),
+  fileList: document.getElementById('fileList'),
+  fileCount: document.getElementById('fileCount'),
+  content: document.getElementById('content'),
+  copyPromptBtn: document.getElementById('copyPromptBtn'),
+  copyAllBtn: document.getElementById('copyAllBtn'),
+  exportTxtBtn: document.getElementById('exportTxtBtn'),
+  exportJsonBtn: document.getElementById('exportJsonBtn'),
+  statusText: document.getElementById('statusText')
+};
+
+els.fileInput.addEventListener('change', event => {
+  handleFiles([...event.target.files]);
+  event.target.value = '';
+});
+
+els.addFilesBtn.addEventListener('click', () => els.fileInput.click());
+els.clearBtn.addEventListener('click', clearAll);
+
+['dragenter', 'dragover'].forEach(type => {
+  els.dropZone.addEventListener(type, event => {
+    event.preventDefault();
+    els.dropZone.classList.add('dragover');
+  });
+});
+
+['dragleave', 'drop'].forEach(type => {
+  els.dropZone.addEventListener(type, event => {
+    event.preventDefault();
+    els.dropZone.classList.remove('dragover');
+  });
+});
+
+els.dropZone.addEventListener('drop', event => {
+  handleFiles([...event.dataTransfer.files]);
+});
+
+els.copyPromptBtn.addEventListener('click', async () => {
+  const item = selectedItem();
+  if (!item) return;
+  const text = item.result.positivePrompt || item.result.parametersText || '';
+  await copyText(text, 'Prompt copied');
+});
+
+els.copyAllBtn.addEventListener('click', async () => {
+  const item = selectedItem();
+  if (!item) return;
+  await copyText(formatAsText(item), 'All extracted data copied');
+});
+
+els.exportTxtBtn.addEventListener('click', () => {
+  const item = selectedItem();
+  if (!item) return;
+  downloadBlob(
+    safeBaseName(item.file.name) + '_metadata.txt',
+    new Blob([formatAsText(item)], { type: 'text/plain;charset=utf-8' })
+  );
+});
+
+els.exportJsonBtn.addEventListener('click', () => {
+  const item = selectedItem();
+  if (!item) return;
+  const payload = {
+    file: {
+      name: item.file.name,
+      type: item.file.type || item.detectedType,
+      size: item.file.size
+    },
+    extracted: item.result
+  };
+  downloadBlob(
+    safeBaseName(item.file.name) + '_metadata.json',
+    new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
+  );
+});
+
+async function handleFiles(files) {
+  const supported = files.filter(file =>
+    /\.(png|jpe?g|webp|mp4|m4v|mov|webm|mkv)$/i.test(file.name) ||
+    ['image/png', 'image/jpeg', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska'].includes(file.type)
+  );
+
+  if (!supported.length) {
+    setStatus('No supported image (PNG, JPEG, WebP) or video (MP4, MOV, WebM, MKV) files found', 'warn');
+    return;
+  }
+
+  setStatus(`Reading ${supported.length} file${supported.length === 1 ? '' : 's'}…`);
+
+  for (const file of supported) {
+    const item = {
+      file,
+      objectUrl: URL.createObjectURL(file),
+      detectedType: 'Unknown',
+      result: emptyResult(),
+      error: null
+    };
+
+    state.items.push(item);
+    renderFileList();
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const parsed = await parseImage(buffer, file);
+      item.detectedType = parsed.detectedType;
+      item.result = parsed.result;
+    } catch (error) {
+      console.error(error);
+      item.error = error instanceof Error ? error.message : String(error);
+    }
+
+    renderFileList();
+
+    if (state.selectedIndex === -1) {
+      selectItem(0);
+    } else if (state.selectedIndex === state.items.indexOf(item)) {
+      renderSelected();
+    }
+  }
+
+  els.clearBtn.disabled = state.items.length === 0;
+  setStatus(`${supported.length} file${supported.length === 1 ? '' : 's'} loaded`, 'good');
+}
+
+function clearAll() {
+  for (const item of state.items) URL.revokeObjectURL(item.objectUrl);
+  state.items = [];
+  state.selectedIndex = -1;
+  renderFileList();
+  renderSelected();
+  setStatus('Ready');
+}
+
+function selectedItem() {
+  return state.items[state.selectedIndex] || null;
+}
+
+function selectItem(index) {
+  state.selectedIndex = index;
+  renderFileList();
+  renderSelected();
+}
+
+function renderFileList() {
+  els.fileCount.textContent = `${state.items.length} file${state.items.length === 1 ? '' : 's'}`;
+  els.clearBtn.disabled = state.items.length === 0;
+
+  if (!state.items.length) {
+    els.fileList.innerHTML = '<div class="file-empty">No files loaded yet.</div>';
+    return;
+  }
+
+  els.fileList.innerHTML = '';
+  state.items.forEach((item, index) => {
+    const button = document.createElement('button');
+    button.className = 'file-item' + (index === state.selectedIndex ? ' active' : '');
+    button.type = 'button';
+    button.addEventListener('click', () => selectItem(index));
+
+    const isVideo = /^video\//.test(item.file.type) || /\.(mp4|m4v|mov|webm|mkv)$/i.test(item.file.name);
+    const img = document.createElement(isVideo ? 'video' : 'img');
+    img.className = 'thumb';
+    img.src = item.objectUrl;
+    if (isVideo) {
+      img.muted = true;
+      img.preload = 'metadata';
+      img.playsInline = true;
+    } else {
+      img.alt = '';
+    }
+
+    const text = document.createElement('div');
+    text.style.minWidth = '0';
+
+    const name = document.createElement('div');
+    name.className = 'file-name';
+    name.textContent = item.file.name;
+    name.title = item.file.name;
+
+    const meta = document.createElement('div');
+    meta.className = 'file-meta';
+    const source = item.error
+      ? 'Error'
+      : (item.result.generator || item.detectedType || 'Reading…');
+    meta.textContent = `${source} · ${formatBytes(item.file.size)}`;
+
+    text.append(name, meta);
+    button.append(img, text);
+    els.fileList.append(button);
+  });
+}
+
+function renderSelected() {
+  const item = selectedItem();
+  const enabled = Boolean(item);
+
+  els.copyPromptBtn.disabled = !enabled || !(item.result.positivePrompt || item.result.parametersText);
+  els.copyAllBtn.disabled = !enabled;
+  els.exportTxtBtn.disabled = !enabled;
+  els.exportJsonBtn.disabled = !enabled;
+
+  if (!item) {
+    els.content.innerHTML = `
+      <div class="welcome">
+        <div>
+          <strong>Load an AI-generated image or video to inspect it.</strong><br>
+          Exact prompts can only be recovered when the file still contains metadata.
+        </div>
+      </div>`;
+    return;
+  }
+
+  if (item.error) {
+    els.content.innerHTML = `
+      <div class="notice">
+        <strong>Could not read this file.</strong><br>
+        ${escapeHtml(item.error)}
+      </div>`;
+    return;
+  }
+
+  const r = item.result;
+  const foundAnything = Object.keys(r.rawMetadata).length ||
+    r.positivePrompt || r.negativePrompt || r.parametersText ||
+    Object.keys(r.details).length;
+
+  const summaryCards = [
+    ['Generator', r.generator || 'Unknown'],
+    ['Format', item.detectedType],
+    ['Metadata fields', String(Object.keys(r.rawMetadata).length)],
+    ['Prompt found', (r.positivePrompt || r.parametersText) ? 'Yes' : 'No']
+  ];
+
+  let html = `
+    <div class="summary-grid">
+      ${summaryCards.map(([label, value]) => `
+        <div class="summary-card">
+          <div class="label">${escapeHtml(label)}</div>
+          <div class="value">${escapeHtml(value)}</div>
+        </div>`).join('')}
+    </div>`;
+
+  if (!foundAnything) {
+    html += `
+      <div class="notice">
+        No readable generation metadata was found. The file may have been stripped by a website,
+        messaging app, screenshot, editor, upscaler, or video re-encode.
+      </div>`;
+  }
+
+  if (r.positivePrompt) {
+    html += promptSection('Positive Prompt', r.positivePrompt, 'positivePrompt');
+  }
+
+  if (r.negativePrompt) {
+    html += promptSection('Negative Prompt', r.negativePrompt, 'negativePrompt');
+  }
+
+  if (!r.positivePrompt && r.parametersText) {
+    html += promptSection('Parameters / Prompt Text', r.parametersText, 'parametersText');
+  }
+
+  if (Object.keys(r.details).length) {
+    html += `
+      <section class="section">
+        <div class="section-title">
+          <span>Generation Details</span>
+          <span class="pill accent">${Object.keys(r.details).length} fields</span>
+        </div>
+        <div class="section-body">
+          ${renderKeyValueTable(r.details)}
+        </div>
+      </section>`;
+  }
+
+  if (r.loras.length) {
+    html += `
+      <section class="section">
+        <div class="section-title"><span>LoRAs</span><span class="pill">${r.loras.length}</span></div>
+        <div class="section-body">
+          ${renderKeyValueTable(Object.fromEntries(r.loras.map((lora, i) => [
+            `LoRA ${i + 1}`,
+            [lora.name, lora.strengthModel != null ? `model ${lora.strengthModel}` : '', lora.strengthClip != null ? `clip ${lora.strengthClip}` : '']
+              .filter(Boolean).join(' · ')
+          ])))}
+        </div>
+      </section>`;
+  }
+
+  if (r.comfyPromptJson) {
+    html += collapsibleJsonSection('ComfyUI API Prompt JSON', r.comfyPromptJson);
+  }
+
+  if (r.comfyWorkflowJson) {
+    html += collapsibleJsonSection('ComfyUI Workflow JSON', r.comfyWorkflowJson);
+  }
+
+  if (Object.keys(r.rawMetadata).length) {
+    html += `
+      <section class="section">
+        <div class="section-title">
+          <span>All Raw Metadata</span>
+          <span class="pill">${Object.keys(r.rawMetadata).length} fields</span>
+        </div>
+        <div class="section-body">
+          ${renderRawMetadata(r.rawMetadata)}
+        </div>
+      </section>`;
+  }
+
+  els.content.innerHTML = html;
+
+  els.content.querySelectorAll('[data-copy-field]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const field = button.getAttribute('data-copy-field');
+      await copyText(r[field] || '', `${button.dataset.label || 'Text'} copied`);
+    });
+  });
+}
+
+function promptSection(title, text, field) {
+  return `
+    <section class="section">
+      <div class="section-title">
+        <span>${escapeHtml(title)}</span>
+        <button type="button" data-copy-field="${escapeHtml(field)}" data-label="${escapeHtml(title)}">Copy</button>
+      </div>
+      <div class="section-body">
+        <textarea readonly spellcheck="false">${escapeHtml(text)}</textarea>
+      </div>
+    </section>`;
+}
+
+function collapsibleJsonSection(title, value) {
+  const pretty = typeof value === 'string'
+    ? prettyMaybeJson(value)
+    : JSON.stringify(value, null, 2);
+
+  return `
+    <section class="section">
+      <div class="section-title"><span>${escapeHtml(title)}</span></div>
+      <div class="section-body">
+        <details>
+          <summary>Show JSON</summary>
+          <pre>${escapeHtml(pretty)}</pre>
+        </details>
+      </div>
+    </section>`;
+}
+
+function renderKeyValueTable(obj) {
+  return `
+    <table class="kv-table">
+      <tbody>
+        ${Object.entries(obj).map(([key, value]) => `
+          <tr>
+            <th>${escapeHtml(key)}</th>
+            <td>${escapeHtml(formatValue(value))}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function renderRawMetadata(metadata) {
+  return Object.entries(metadata).map(([key, value]) => {
+    const display = typeof value === 'string' ? prettyMaybeJson(value) : JSON.stringify(value, null, 2);
+    const isLong = display.length > 250 || display.includes('\n');
+
+    if (isLong) {
+      return `
+        <details style="margin-bottom:10px">
+          <summary>${escapeHtml(key)}</summary>
+          <pre style="margin-top:8px">${escapeHtml(display)}</pre>
+        </details>`;
+    }
+
+    return `
+      <table class="kv-table">
+        <tbody>
+          <tr>
+            <th>${escapeHtml(key)}</th>
+            <td>${escapeHtml(display)}</td>
+          </tr>
+        </tbody>
+      </table>`;
+  }).join('');
+}
+
+async function parseImage(buffer, file) {
+  const bytes = new Uint8Array(buffer);
+
+  if (isPng(bytes)) {
+    const raw = await parsePngMetadata(bytes);
+    return { detectedType: 'PNG', result: interpretMetadata(raw) };
+  }
+
+  if (isJpeg(bytes)) {
+    const raw = parseJpegMetadata(bytes);
+    return { detectedType: 'JPEG', result: interpretMetadata(raw) };
+  }
+
+  if (isWebP(bytes)) {
+    const raw = parseWebPMetadata(bytes);
+    return { detectedType: isAnimatedWebP(bytes) ? 'WebP (animated)' : 'WebP', result: interpretMetadata(normalizeMetadata(raw)) };
+  }
+
+  if (isIsoBmff(bytes)) {
+    const raw = parseMp4Metadata(bytes);
+    const brand = ascii(bytes.subarray(8, 12));
+    return { detectedType: brand === 'qt  ' ? 'MOV video' : 'MP4 video', result: interpretMetadata(normalizeMetadata(raw)) };
+  }
+
+  if (isEbml(bytes)) {
+    const raw = parseMatroskaMetadata(bytes);
+    return { detectedType: /\.mkv$/i.test(file.name) ? 'MKV video' : 'WebM video', result: interpretMetadata(normalizeMetadata(raw)) };
+  }
+
+  throw new Error(`Unsupported or unrecognized file format: ${file.name}`);
+}
+
+// ComfyUI stores WebP metadata in EXIF text tags as "Prompt:{json}" / "Workflow:{json}",
+// and some video savers (VideoHelperSuite) pack everything into one JSON "comment".
+// Lift those into plain prompt / workflow keys so the normal interpreter finds them.
+function normalizeMetadata(raw) {
+  const out = { ...raw };
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value !== 'string') continue;
+    const text = value.trim();
+
+    const prefixed = text.match(/^([A-Za-z][\w ]{0,40}):\s*([\[{][\s\S]*)$/);
+    if (prefixed && parseJsonLoose(prefixed[2])) {
+      addMetadata(out, prefixed[1].trim().toLowerCase(), prefixed[2]);
+      continue;
+    }
+
+    const obj = parseJsonLoose(text);
+    if (obj && !Array.isArray(obj) && typeof obj === 'object' && ('prompt' in obj || 'workflow' in obj)
+        && !/^(prompt|workflow)$/i.test(key)) {
+      for (const [k, v] of Object.entries(obj)) {
+        if (!(k.toLowerCase() in out)) {
+          addMetadata(out, k.toLowerCase(), typeof v === 'string' ? v : JSON.stringify(v));
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function isAnimatedWebP(bytes) {
+  return ascii(bytes.subarray(12, 16)) === 'VP8X' && bytes.length > 20 && (bytes[20] & 0x02) !== 0;
+}
+
+function isIsoBmff(bytes) {
+  return bytes.length >= 12 && ascii(bytes.subarray(4, 8)) === 'ftyp';
+}
+
+function isEbml(bytes) {
+  return bytes.length >= 4 && bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3;
+}
+
+// ── MP4 / MOV ─────────────────────────────────────────────────────────────────
+// Walks the box tree for metadata only (moov > udta / meta). Handles:
+//  - QuickTime mdta keys + ilst (ffmpeg -movflags use_metadata_tags, ComfyUI SaveVideo)
+//  - iTunes-style ilst (©cmt, ©nam, desc, ...) under udta > meta
+//  - QuickTime udta text atoms (©cmt with size + language header)
+function parseMp4Metadata(bytes) {
+  const metadata = {};
+  const containers = new Set(['moov', 'udta', 'trak', 'mdia', 'minf']);
+  const itunesNames = {
+    '©cmt': 'comment', '©nam': 'title', '©too': 'encoder', '©des': 'description',
+    'desc': 'description', '©inf': 'information', '©ART': 'artist', 'ldes': 'long description',
+    '©day': 'date', '©swr': 'software'
+  };
+
+  const readBoxes = (start, end, fn) => {
+    let p = start;
+    while (p + 8 <= end) {
+      let size = readU32BE(bytes, p);
+      const type = latin1(bytes.subarray(p + 4, p + 8));
+      let header = 8;
+      if (size === 1) {
+        if (p + 16 > end) break;
+        size = readU32BE(bytes, p + 8) * 0x100000000 + readU32BE(bytes, p + 12);
+        header = 16;
+      } else if (size === 0) {
+        size = end - p;
+      }
+      if (size < header || p + size > end) break;
+      fn(type, p + header, p + size);
+      p += size;
+    }
+  };
+
+  const dataBoxValue = (start, end) => {
+    // 'data' box: type(4) locale(4) payload
+    let value = null;
+    readBoxes(start, end, (type, s, e) => {
+      if (type === 'data' && e - s >= 8 && value === null) {
+        const wellKnown = readU32BE(bytes, s) & 0xFFFFFF;
+        const payload = bytes.subarray(s + 8, e);
+        value = (wellKnown === 1 || wellKnown === 0) ? utf8(payload) : decodeBestEffort(payload);
+      }
+    });
+    return value;
+  };
+
+  const parseMeta = (start, end) => {
+    // 'meta' is a full box in MP4 (4 bytes version/flags) but not always in QuickTime.
+    if (latin1(bytes.subarray(start + 4, start + 8)) !== 'hdlr' && readU32BE(bytes, start) === 0) start += 4;
+    let keys = [];
+    readBoxes(start, end, (type, s, e) => {
+      if (type === 'keys' && e - s >= 8) {
+        const count = readU32BE(bytes, s + 4);
+        let q = s + 8;
+        for (let i = 0; i < count && q + 8 <= e; i++) {
+          const ks = readU32BE(bytes, q);
+          if (ks < 8 || q + ks > e) break;
+          keys.push(utf8(bytes.subarray(q + 8, q + ks)));
+          q += ks;
+        }
+      }
+    });
+    readBoxes(start, end, (type, s, e) => {
+      if (type !== 'ilst') return;
+      readBoxes(s, e, (itemType, is, ie) => {
+        const value = dataBoxValue(is, ie);
+        if (value == null || value === '') return;
+        const index = readU32BE(bytes, is - 4);
+        let name;
+        if (keys.length && index >= 1 && index <= keys.length) name = keys[index - 1];
+        else if (itemType === '----') name = 'custom';
+        else name = itunesNames[itemType] || itemType;
+        addMetadata(metadata, name, value);
+      });
+    });
+  };
+
+  const walk = (start, end, depth) => {
+    if (depth > 8) return;
+    readBoxes(start, end, (type, s, e) => {
+      if (type === 'meta') {
+        parseMeta(s, e);
+      } else if (containers.has(type)) {
+        walk(s, e, depth + 1);
+      } else if (type.charCodeAt(0) === 0xA9 && e - s > 4) {
+        // QuickTime udta text atom: size(2) lang(2) text
+        const len = readU16BE(bytes, s);
+        if (len > 0 && s + 4 + len <= e) {
+          addMetadata(metadata, itunesNames[type] || type, utf8(bytes.subarray(s + 4, s + 4 + len)));
+        } else {
+          const value = dataBoxValue(s, e);
+          if (value) addMetadata(metadata, itunesNames[type] || type, value);
+        }
+      }
+    });
+  };
+
+  walk(0, bytes.length, 0);
+  return metadata;
+}
+
+// ── WebM / MKV ────────────────────────────────────────────────────────────────
+// Reads Segment > Tags > Tag > SimpleTag (TagName / TagString), which is where
+// ffmpeg / PyAV write container metadata such as prompt and workflow.
+function parseMatroskaMetadata(bytes) {
+  const metadata = {};
+  const ID = { SEGMENT: 0x18538067, TAGS: 0x1254C367, TAG: 0x7373, SIMPLETAG: 0x67C8, TAGNAME: 0x45A3, TAGSTRING: 0x4487 };
+
+  const readId = p => {
+    const first = bytes[p];
+    let len = 1;
+    while (len <= 4 && !(first & (0x80 >> (len - 1)))) len++;
+    if (len > 4 || p + len > bytes.length) return null;
+    let id = 0;
+    for (let i = 0; i < len; i++) id = id * 256 + bytes[p + i];
+    return { id, len };
+  };
+
+  const readSize = p => {
+    const first = bytes[p];
+    let len = 1;
+    while (len <= 8 && !(first & (0x80 >> (len - 1)))) len++;
+    if (len > 8 || p + len > bytes.length) return null;
+    let value = first & (0xFF >> len);
+    let allOnes = value === (0xFF >> len);
+    for (let i = 1; i < len; i++) {
+      value = value * 256 + bytes[p + i];
+      if (bytes[p + i] !== 0xFF) allOnes = false;
+    }
+    return { size: allOnes ? null : value, len };
+  };
+
+  const elements = (start, end, fn) => {
+    let p = start;
+    while (p < end) {
+      const id = readId(p);
+      if (!id) break;
+      const sz = readSize(p + id.len);
+      if (!sz) break;
+      const dataStart = p + id.len + sz.len;
+      const dataEnd = sz.size == null ? end : Math.min(end, dataStart + sz.size);
+      if (fn(id.id, dataStart, dataEnd, sz.size == null) === false) break;
+      p = dataEnd;
+    }
+  };
+
+  const simpleTag = (start, end, prefix) => {
+    let name = '', value = null;
+    elements(start, end, (id, s, e) => {
+      if (id === ID.TAGNAME) name = utf8(bytes.subarray(s, e));
+      else if (id === ID.TAGSTRING) value = utf8(bytes.subarray(s, e));
+      else if (id === ID.SIMPLETAG) simpleTag(s, e, (prefix ? prefix + '.' : '') + name);
+    });
+    if (name && value != null && value !== '') {
+      const key = (prefix ? prefix + '.' : '') + name;
+      addMetadata(metadata, /^(prompt|workflow|comment|description|title|encoder)$/i.test(name) ? name.toLowerCase() : key, value);
+    }
+  };
+
+  elements(0, bytes.length, (id, s, e) => {
+    if (id !== ID.SEGMENT) return;
+    elements(s, e, (cid, cs, ce, unknownSize) => {
+      if (cid === ID.TAGS) {
+        elements(cs, ce, (tid, ts, te) => {
+          if (tid !== ID.TAG) return;
+          elements(ts, te, (sid, ss, se) => {
+            if (sid === ID.SIMPLETAG) simpleTag(ss, se, '');
+          });
+        });
+      }
+      // An unknown-size element (live-streamed cluster) swallows the rest; stop there.
+      if (unknownSize) return false;
+    });
+  });
+
+  return metadata;
+}
+
+function isPng(bytes) {
+  return bytes.length >= 8 &&
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47 &&
+    bytes[4] === 0x0D && bytes[5] === 0x0A && bytes[6] === 0x1A && bytes[7] === 0x0A;
+}
+
+function isJpeg(bytes) {
+  return bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xD8;
+}
+
+function isWebP(bytes) {
+  return bytes.length >= 12 &&
+    ascii(bytes.subarray(0, 4)) === 'RIFF' &&
+    ascii(bytes.subarray(8, 12)) === 'WEBP';
+}
+
+async function parsePngMetadata(bytes) {
+  const metadata = {};
+  let offset = 8;
+
+  while (offset + 12 <= bytes.length) {
+    const length = readU32BE(bytes, offset);
+    const type = ascii(bytes.subarray(offset + 4, offset + 8));
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+
+    if (dataEnd + 4 > bytes.length) break;
+    const data = bytes.subarray(dataStart, dataEnd);
+
+    try {
+      if (type === 'tEXt') {
+        const zero = data.indexOf(0);
+        if (zero >= 0) {
+          const keyword = latin1(data.subarray(0, zero));
+          const text = latin1(data.subarray(zero + 1));
+          addMetadata(metadata, keyword, text);
+        }
+      } else if (type === 'zTXt') {
+        const zero = data.indexOf(0);
+        if (zero >= 0 && zero + 2 <= data.length) {
+          const keyword = latin1(data.subarray(0, zero));
+          const compressed = data.subarray(zero + 2);
+          const text = await inflateUtf8(compressed);
+          addMetadata(metadata, keyword, text);
+        }
+      } else if (type === 'iTXt') {
+        const parsed = await parseITXt(data);
+        if (parsed) addMetadata(metadata, parsed.keyword, parsed.text);
+      } else if (type === 'eXIf') {
+        mergeMetadata(metadata, parseExifBlock(data, 'EXIF'));
+      }
+    } catch (error) {
+      addMetadata(metadata, `${type} parse warning`, String(error));
+    }
+
+    offset = dataEnd + 4;
+    if (type === 'IEND') break;
+  }
+
+  return metadata;
+}
+
+async function parseITXt(data) {
+  let p = 0;
+  const keywordEnd = data.indexOf(0, p);
+  if (keywordEnd < 0) return null;
+  const keyword = latin1(data.subarray(p, keywordEnd));
+  p = keywordEnd + 1;
+
+  if (p + 2 > data.length) return null;
+  const compressedFlag = data[p++];
+  p++; // compression method
+
+  const languageEnd = data.indexOf(0, p);
+  if (languageEnd < 0) return null;
+  p = languageEnd + 1;
+
+  const translatedEnd = data.indexOf(0, p);
+  if (translatedEnd < 0) return null;
+  p = translatedEnd + 1;
+
+  const payload = data.subarray(p);
+  const text = compressedFlag === 1
+    ? await inflateUtf8(payload)
+    : utf8(payload);
+
+  return { keyword, text };
+}
+
+async function inflateUtf8(bytes) {
+  if (typeof DecompressionStream === 'undefined') {
+    return `[Compressed metadata found, but this browser cannot decompress it]`;
+  }
+
+  const formats = ['deflate', 'deflate-raw'];
+  let lastError = null;
+
+  for (const format of formats) {
+    try {
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream(format));
+      const buffer = await new Response(stream).arrayBuffer();
+      return new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('Unable to decompress PNG text metadata');
+}
+
+function parseJpegMetadata(bytes) {
+  const metadata = {};
+  let offset = 2;
+  let commentIndex = 1;
+
+  while (offset + 4 <= bytes.length) {
+    if (bytes[offset] !== 0xFF) {
+      offset++;
+      continue;
+    }
+
+    while (offset < bytes.length && bytes[offset] === 0xFF) offset++;
+    if (offset >= bytes.length) break;
+
+    const marker = bytes[offset++];
+
+    if (marker === 0xD9 || marker === 0xDA) break;
+    if (marker >= 0xD0 && marker <= 0xD7) continue;
+    if (marker === 0x01) continue;
+
+    if (offset + 2 > bytes.length) break;
+    const segmentLength = readU16BE(bytes, offset);
+    if (segmentLength < 2 || offset + segmentLength > bytes.length) break;
+
+    const data = bytes.subarray(offset + 2, offset + segmentLength);
+
+    if (marker === 0xE1) {
+      const header = ascii(data.subarray(0, Math.min(data.length, 35)));
+
+      if (header.startsWith('Exif\0\0')) {
+        mergeMetadata(metadata, parseExifBlock(data.subarray(6), 'EXIF'));
+      } else if (header.startsWith('http://ns.adobe.com/xap/1.0/\0')) {
+        const xml = utf8(data.subarray(29));
+        addMetadata(metadata, 'XMP', xml);
+        mergeMetadata(metadata, extractXmpFields(xml));
+      } else {
+        const text = utf8(data);
+        if (looksReadable(text)) addMetadata(metadata, 'APP1', text);
+      }
+    } else if (marker === 0xFE) {
+      addMetadata(metadata, `JPEG Comment ${commentIndex++}`, decodeBestEffort(data));
+    } else if (marker === 0xED) {
+      const text = decodeBestEffort(data);
+      if (looksReadable(text)) addMetadata(metadata, 'APP13 / IPTC', text);
+    }
+
+    offset += segmentLength;
+  }
+
+  return metadata;
+}
+
+function parseWebPMetadata(bytes) {
+  const metadata = {};
+  let offset = 12;
+
+  while (offset + 8 <= bytes.length) {
+    const type = ascii(bytes.subarray(offset, offset + 4));
+    const size = readU32LE(bytes, offset + 4);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + size;
+
+    if (dataEnd > bytes.length) break;
+    const data = bytes.subarray(dataStart, dataEnd);
+
+    if (type === 'EXIF') {
+      let exifData = data;
+      if (ascii(data.subarray(0, 6)) === 'Exif\0\0') exifData = data.subarray(6);
+      mergeMetadata(metadata, parseExifBlock(exifData, 'EXIF'));
+    } else if (type === 'XMP ') {
+      const xml = utf8(data);
+      addMetadata(metadata, 'XMP', xml);
+      mergeMetadata(metadata, extractXmpFields(xml));
+    } else if (type === 'META' || type === 'ICMT') {
+      const text = decodeBestEffort(data);
+      if (looksReadable(text)) addMetadata(metadata, `WebP ${type}`, text);
+    }
+
+    offset = dataEnd + (size % 2);
+  }
+
+  return metadata;
+}
+
+function parseExifBlock(bytes, prefix = 'EXIF') {
+  const metadata = {};
+  if (bytes.length < 8) return metadata;
+
+  const endianMark = ascii(bytes.subarray(0, 2));
+  const little = endianMark === 'II';
+  if (!little && endianMark !== 'MM') return metadata;
+
+  const read16 = offset => little ? readU16LE(bytes, offset) : readU16BE(bytes, offset);
+  const read32 = offset => little ? readU32LE(bytes, offset) : readU32BE(bytes, offset);
+
+  if (read16(2) !== 42) return metadata;
+  const firstIfd = read32(4);
+  const visited = new Set();
+
+  const tagNames = {
+    0x010E: 'ImageDescription',
+    0x010F: 'Make',
+    0x0110: 'Model',
+    0x0131: 'Software',
+    0x0132: 'DateTime',
+    0x8298: 'Copyright',
+    0x8769: 'ExifIFDPointer',
+    0x8825: 'GPSIFDPointer',
+    0x9003: 'DateTimeOriginal',
+    0x9286: 'UserComment',
+    0xA420: 'ImageUniqueID',
+    0x9C9B: 'XPTitle',
+    0x9C9C: 'XPComment',
+    0x9C9D: 'XPAuthor',
+    0x9C9E: 'XPKeywords',
+    0x9C9F: 'XPSubject'
+  };
+
+  const typeSizes = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8 };
+
+  function parseIfd(ifdOffset, label) {
+    if (!Number.isFinite(ifdOffset) || ifdOffset < 0 || ifdOffset + 2 > bytes.length || visited.has(ifdOffset)) return;
+    visited.add(ifdOffset);
+
+    const count = read16(ifdOffset);
+    for (let i = 0; i < count; i++) {
+      const entry = ifdOffset + 2 + i * 12;
+      if (entry + 12 > bytes.length) break;
+
+      const tag = read16(entry);
+      const type = read16(entry + 2);
+      const valueCount = read32(entry + 4);
+      const unitSize = typeSizes[type];
+      if (!unitSize) continue;
+
+      const totalSize = unitSize * valueCount;
+      const valueOffset = totalSize <= 4 ? entry + 8 : read32(entry + 8);
+      if (valueOffset < 0 || valueOffset + totalSize > bytes.length) continue;
+
+      const raw = bytes.subarray(valueOffset, valueOffset + totalSize);
+      const name = tagNames[tag] || `${label} Tag 0x${tag.toString(16).padStart(4, '0')}`;
+
+      if (tag === 0x8769) {
+        parseIfd(read32(entry + 8), 'Exif');
+        continue;
+      }
+
+      let value = null;
+
+      if (tag >= 0x9C9B && tag <= 0x9C9F) {
+        value = decodeUtf16Le(raw).replace(/\0+$/g, '').trim();
+      } else if (tag === 0x9286) {
+        value = decodeExifUserComment(raw);
+      } else if (type === 2) {
+        value = decodeBestEffort(raw).replace(/\0+$/g, '').trim();
+      } else if (type === 1 || type === 7) {
+        const text = decodeBestEffort(raw).replace(/\0+$/g, '').trim();
+        if (looksReadable(text)) value = text;
+      } else if (type === 3 && valueCount === 1) {
+        value = little ? readU16LE(raw, 0) : readU16BE(raw, 0);
+      } else if ((type === 4 || type === 9) && valueCount === 1) {
+        value = little ? readU32LE(raw, 0) : readU32BE(raw, 0);
+      }
+
+      if (value !== null && value !== '') addMetadata(metadata, `${prefix} ${name}`, value);
+    }
+  }
+
+  parseIfd(firstIfd, 'IFD0');
+  return metadata;
+}
+
+function decodeExifUserComment(raw) {
+  if (raw.length >= 8) {
+    const marker = ascii(raw.subarray(0, 8));
+    const payload = raw.subarray(8);
+
+    if (marker.startsWith('ASCII')) return latin1(payload).replace(/\0+$/g, '').trim();
+    if (marker.startsWith('UNICODE')) {
+      const be = payload.length >= 2 && payload[0] === 0xFE && payload[1] === 0xFF;
+      const le = payload.length >= 2 && payload[0] === 0xFF && payload[1] === 0xFE;
+      if (le) return decodeUtf16Le(payload.subarray(2)).replace(/\0+$/g, '').trim();
+      if (be) return decodeUtf16Be(payload.subarray(2)).replace(/\0+$/g, '').trim();
+
+      // No BOM: A1111/Forge (piexif) write big-endian. Pick the byte order whose text is
+      // mostly ordinary ASCII; both orders look "printable", so printableScore can't decide.
+      const leText = decodeUtf16Le(payload).replace(/\0+$/g, '').trim();
+      const beText = decodeUtf16Be(payload).replace(/\0+$/g, '').trim();
+      return asciiScore(beText) >= asciiScore(leText) ? beText : leText;
+    }
+  }
+
+  return decodeBestEffort(raw).replace(/\0+$/g, '').trim();
+}
+
+function extractXmpFields(xml) {
+  const metadata = {};
+  const fields = [
+    ['XMP Description', /<dc:description[^>]*>[\s\S]*?<rdf:li[^>]*>([\s\S]*?)<\/rdf:li>/i],
+    ['XMP Title', /<dc:title[^>]*>[\s\S]*?<rdf:li[^>]*>([\s\S]*?)<\/rdf:li>/i],
+    ['XMP Comment', /(?:photoshop:Instructions|exif:UserComment|xmp:Label)="([^"]*)"/i]
+  ];
+
+  for (const [name, regex] of fields) {
+    const match = xml.match(regex);
+    if (match) addMetadata(metadata, name, decodeXml(match[1]).trim());
+  }
+
+  const attrs = [...xml.matchAll(/(?:prompt|parameters|workflow|negativePrompt|positivePrompt)="([^"]+)"/gi)];
+  for (const match of attrs) {
+    addMetadata(metadata, `XMP ${match[0].split('=')[0]}`, decodeXml(match[1]));
+  }
+
+  return metadata;
+}
+
+function interpretMetadata(rawMetadata) {
+  const result = emptyResult();
+  result.rawMetadata = rawMetadata;
+
+  const lowerMap = new Map(
+    Object.entries(rawMetadata).map(([key, value]) => [key.toLowerCase(), value])
+  );
+
+  const promptValue = findMetadataValue(lowerMap, [
+    'prompt',
+    'comfyui prompt',
+    'api prompt'
+  ]);
+
+  const workflowValue = findMetadataValue(lowerMap, [
+    'workflow',
+    'comfyui workflow'
+  ]);
+
+  const parametersValue = findMetadataValue(lowerMap, [
+    'parameters',
+    'a1111 parameters',
+    'sd parameters'
+  ]);
+
+  if (promptValue != null) {
+    const parsedPrompt = parseJsonLoose(promptValue);
+    if (parsedPrompt && typeof parsedPrompt === 'object') {
+      result.comfyPromptJson = parsedPrompt;
+      result.generator = 'ComfyUI';
+      extractComfyPrompt(parsedPrompt, result);
+    } else if (typeof promptValue === 'string') {
+      result.positivePrompt = promptValue.trim();
+    }
+  }
+
+  if (workflowValue != null) {
+    const parsedWorkflow = parseJsonLoose(workflowValue);
+    result.comfyWorkflowJson = parsedWorkflow || workflowValue;
+    if (!result.generator) result.generator = 'ComfyUI';
+    if (parsedWorkflow) extractComfyWorkflow(parsedWorkflow, result);
+  }
+
+  if (parametersValue != null) {
+    const text = formatValue(parametersValue);
+    result.parametersText = text;
+    parseA1111Parameters(text, result);
+    if (!result.generator) result.generator = 'Automatic1111 / Forge';
+  }
+
+  for (const [key, value] of Object.entries(rawMetadata)) {
+    if (typeof value !== 'string') continue;
+    const text = value.trim();
+    if (!text) continue;
+
+    const keyLower = key.toLowerCase();
+
+    if (!result.generator) {
+      if (keyLower.includes('invokeai')) result.generator = 'InvokeAI';
+      else if (keyLower.includes('novelai')) result.generator = 'NovelAI';
+      else if (keyLower.includes('software') && /comfyui/i.test(text)) result.generator = 'ComfyUI';
+      else if (/stable diffusion|automatic1111|forge/i.test(text)) result.generator = 'Stable Diffusion UI';
+    }
+
+    if (!result.positivePrompt && /^(positive[\s_-]*prompt|description|prompt)$/i.test(key.trim())) {
+      result.positivePrompt = text;
+    }
+
+    if (!result.negativePrompt && /negative[\s_-]*prompt/i.test(key)) {
+      result.negativePrompt = text;
+    }
+
+    if (!result.parametersText && looksLikeA1111Parameters(text)) {
+      result.parametersText = text;
+      parseA1111Parameters(text, result);
+      if (!result.generator) result.generator = 'Automatic1111 / Forge';
+    }
+
+    const maybeJson = parseJsonLoose(text);
+    if (maybeJson && typeof maybeJson === 'object') {
+      extractGenericJson(maybeJson, result, key);
+    }
+  }
+
+  // Search well-known EXIF fields for embedded parameter blocks.
+  for (const [key, value] of Object.entries(rawMetadata)) {
+    if (typeof value !== 'string') continue;
+    if (!/(usercomment|imagedescription|xpcomment|comment|description)/i.test(key)) continue;
+    // Skip raw JSON / "Workflow:{...}" blobs; those are handled as ComfyUI data above.
+    if (/^\s*(?:[A-Za-z][\w ]{0,40}:\s*)?[\[{]/.test(value)) continue;
+
+    if (!result.parametersText && looksLikeA1111Parameters(value)) {
+      result.parametersText = value;
+      parseA1111Parameters(value, result);
+      if (!result.generator) result.generator = 'Automatic1111 / Forge';
+    } else if (!result.positivePrompt && value.length > 10) {
+      result.positivePrompt = value.trim();
+    }
+  }
+
+  if (!result.generator && Object.keys(rawMetadata).length) result.generator = 'Unknown / generic metadata';
+  return result;
+}
+
+function emptyResult() {
+  return {
+    generator: '',
+    positivePrompt: '',
+    negativePrompt: '',
+    parametersText: '',
+    details: {},
+    loras: [],
+    comfyPromptJson: null,
+    comfyWorkflowJson: null,
+    rawMetadata: {}
+  };
+}
+
+function extractComfyPrompt(prompt, result) {
+  const nodes = prompt;
+  if (!nodes || typeof nodes !== 'object') return;
+
+  const samplerEntries = Object.entries(nodes).filter(([, node]) => {
+    const classType = String(node?.class_type || '').toLowerCase();
+    return classType.includes('ksampler') || classType === 'samplercustom';
+  });
+
+  if (samplerEntries.length) {
+    const [, sampler] = samplerEntries[0];
+    const inputs = sampler.inputs || {};
+
+    assignDetail(result, 'Seed', inputs.seed ?? inputs.noise_seed);
+    assignDetail(result, 'Steps', inputs.steps);
+    assignDetail(result, 'CFG', inputs.cfg);
+    assignDetail(result, 'Sampler', inputs.sampler_name);
+    assignDetail(result, 'Scheduler', inputs.scheduler);
+    assignDetail(result, 'Denoise', inputs.denoise);
+
+    const positiveNodeId = linkedNodeId(inputs.positive);
+    const negativeNodeId = linkedNodeId(inputs.negative);
+
+    if (positiveNodeId != null) {
+      result.positivePrompt = collectTextFromNode(nodes, String(positiveNodeId));
+    }
+
+    if (negativeNodeId != null) {
+      result.negativePrompt = collectTextFromNode(nodes, String(negativeNodeId));
+    }
+  }
+
+  for (const [, node] of Object.entries(nodes)) {
+    const classType = String(node?.class_type || '');
+    const lower = classType.toLowerCase();
+    const inputs = node?.inputs || {};
+
+    if (/checkpointloader|unetloader|diffusionmodelloader/i.test(classType)) {
+      const model = inputs.ckpt_name ?? inputs.unet_name ?? inputs.model_name;
+      if (model != null && result.details.Model == null) result.details.Model = model;
+    }
+
+    if (lower.includes('vaeloader') && inputs.vae_name != null) {
+      assignDetail(result, 'VAE', inputs.vae_name);
+    }
+
+    if (lower.includes('loraloader')) {
+      result.loras.push({
+        name: inputs.lora_name || inputs.name || 'Unknown LoRA',
+        strengthModel: inputs.strength_model ?? inputs.strength,
+        strengthClip: inputs.strength_clip
+      });
+    }
+
+    if (lower.includes('emptylatentimage')) {
+      if (inputs.width != null && inputs.height != null) {
+        assignDetail(result, 'Resolution', `${inputs.width} × ${inputs.height}`);
+      }
+      assignDetail(result, 'Batch size', inputs.batch_size);
+    }
+
+    if (!result.positivePrompt && lower.includes('cliptextencode')) {
+      const text = directNodeText(node);
+      if (text) result.positivePrompt = text;
+    }
+  }
+}
+
+function extractComfyWorkflow(workflow, result) {
+  const nodes = Array.isArray(workflow?.nodes) ? workflow.nodes : [];
+  if (!nodes.length) return;
+
+  for (const node of nodes) {
+    const type = String(node.type || '');
+    const widgets = node.widgets_values || [];
+
+    if (/checkpointloader/i.test(type) && widgets[0] != null && result.details.Model == null) {
+      result.details.Model = widgets[0];
+    }
+
+    if (/loraloader/i.test(type)) {
+      result.loras.push({
+        name: widgets[0] || 'Unknown LoRA',
+        strengthModel: widgets[1],
+        strengthClip: widgets[2]
+      });
+    }
+
+    if (/emptylatentimage/i.test(type) && widgets.length >= 2 && result.details.Resolution == null) {
+      result.details.Resolution = `${widgets[0]} × ${widgets[1]}`;
+    }
+  }
+}
+
+function collectTextFromNode(nodes, nodeId, visited = new Set()) {
+  if (visited.has(nodeId)) return '';
+  visited.add(nodeId);
+
+  const node = nodes[nodeId];
+  if (!node) return '';
+
+  const direct = directNodeText(node);
+  if (direct) return direct;
+
+  const inputs = node.inputs || {};
+  const parts = [];
+
+  for (const [key, value] of Object.entries(inputs)) {
+    if (typeof value === 'string' && /text|prompt|string/i.test(key)) {
+      parts.push(value);
+    } else {
+      const linked = linkedNodeId(value);
+      if (linked != null) {
+        const text = collectTextFromNode(nodes, String(linked), visited);
+        if (text) parts.push(text);
+      }
+    }
+  }
+
+  return [...new Set(parts)].join('\n').trim();
+}
+
+function directNodeText(node) {
+  const inputs = node?.inputs || {};
+  const candidates = [
+    inputs.text,
+    inputs.text_g,
+    inputs.text_l,
+    inputs.prompt,
+    inputs.positive,
+    inputs.string
+  ];
+
+  return candidates
+    .filter(value => typeof value === 'string' && value.trim())
+    .join('\n')
+    .trim();
+}
+
+function linkedNodeId(value) {
+  return Array.isArray(value) && value.length && (typeof value[0] === 'string' || typeof value[0] === 'number')
+    ? value[0]
+    : null;
+}
+
+function parseA1111Parameters(text, result) {
+  if (!text) return;
+
+  const negativeMarker = /\nNegative prompt:\s*/i;
+  const stepsMarker = /\nSteps:\s*/i;
+
+  const stepsMatch = text.match(stepsMarker);
+  let promptBlock = text;
+  let settingsBlock = '';
+
+  if (stepsMatch && stepsMatch.index != null) {
+    promptBlock = text.slice(0, stepsMatch.index);
+    settingsBlock = text.slice(stepsMatch.index + 1);
+  }
+
+  const negativeMatch = promptBlock.match(negativeMarker);
+  if (negativeMatch && negativeMatch.index != null) {
+    result.positivePrompt = promptBlock.slice(0, negativeMatch.index).trim();
+    result.negativePrompt = promptBlock.slice(
+      negativeMatch.index + negativeMatch[0].length
+    ).trim();
+  } else if (!result.positivePrompt) {
+    result.positivePrompt = promptBlock.trim();
+  }
+
+  if (!settingsBlock && stepsMatch) {
+    settingsBlock = text.slice(stepsMatch.index + 1);
+  }
+
+  if (settingsBlock) {
+    const parts = splitSettings(settingsBlock);
+    for (const part of parts) {
+      const colon = part.indexOf(':');
+      if (colon < 0) continue;
+      const key = part.slice(0, colon).trim();
+      const value = part.slice(colon + 1).trim();
+      if (key && value) assignDetail(result, key, value);
+    }
+  }
+
+  const loraRegex = /<lora:([^:>]+)(?::([^>]+))?>/gi;
+  for (const match of text.matchAll(loraRegex)) {
+    result.loras.push({
+      name: match[1],
+      strengthModel: match[2] || null,
+      strengthClip: null
+    });
+  }
+}
+
+function splitSettings(text) {
+  const parts = [];
+  let current = '';
+  let depth = 0;
+  let quote = null;
+
+  for (const char of text) {
+    if (quote) {
+      current += char;
+      if (char === quote) quote = null;
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      current += char;
+    } else if (char === '(' || char === '[' || char === '{') {
+      depth++;
+      current += char;
+    } else if (char === ')' || char === ']' || char === '}') {
+      depth = Math.max(0, depth - 1);
+      current += char;
+    } else if (char === ',' && depth === 0) {
+      if (current.trim()) parts.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+function extractGenericJson(obj, result, sourceKey = '') {
+  const flat = flattenObject(obj, '', 0, 5);
+
+  for (const [path, value] of Object.entries(flat)) {
+    if (typeof value !== 'string' && typeof value !== 'number') continue;
+    const lower = path.toLowerCase();
+
+    if (!result.positivePrompt && /(^|\.)(positive_?prompt|prompt|description)$/.test(lower) && typeof value === 'string') {
+      result.positivePrompt = value;
+    } else if (!result.negativePrompt && /negative_?prompt$/.test(lower) && typeof value === 'string') {
+      result.negativePrompt = value;
+    }
+
+    const detailMap = [
+      [/seed$/, 'Seed'],
+      [/steps$/, 'Steps'],
+      [/(cfg|guidance|guidance_scale)$/, 'CFG / Guidance'],
+      [/sampler(_name)?$/, 'Sampler'],
+      [/scheduler$/, 'Scheduler'],
+      [/(model|model_name|ckpt_name)$/, 'Model'],
+      [/width$/, 'Width'],
+      [/height$/, 'Height']
+    ];
+
+    for (const [regex, label] of detailMap) {
+      if (regex.test(lower) && result.details[label] == null) {
+        result.details[label] = value;
+      }
+    }
+  }
+
+  if (!result.generator && sourceKey) {
+    if (/invoke/i.test(sourceKey)) result.generator = 'InvokeAI';
+    if (/novel/i.test(sourceKey)) result.generator = 'NovelAI';
+  }
+}
+
+function flattenObject(value, prefix = '', depth = 0, maxDepth = 5, out = {}) {
+  if (depth > maxDepth) return out;
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => flattenObject(item, `${prefix}[${index}]`, depth + 1, maxDepth, out));
+  } else if (value && typeof value === 'object') {
+    for (const [key, child] of Object.entries(value)) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      flattenObject(child, path, depth + 1, maxDepth, out);
+    }
+  } else if (prefix) {
+    out[prefix] = value;
+  }
+
+  return out;
+}
+
+function findMetadataValue(lowerMap, names) {
+  for (const name of names) {
+    if (lowerMap.has(name)) return lowerMap.get(name);
+  }
+
+  for (const [key, value] of lowerMap.entries()) {
+    if (names.some(name => key.endsWith(' ' + name) || key.includes(name))) return value;
+  }
+
+  return null;
+}
+
+function looksLikeA1111Parameters(text) {
+  return /(?:^|\n)Steps:\s*\d+/i.test(text) &&
+    /(Sampler:|CFG scale:|Seed:|Size:)/i.test(text);
+}
+
+function assignDetail(result, key, value) {
+  if (value !== undefined && value !== null && value !== '') {
+    result.details[key] = value;
+  }
+}
+
+function addMetadata(obj, key, value) {
+  const cleanKey = String(key || 'Unnamed field').trim() || 'Unnamed field';
+  if (!(cleanKey in obj)) {
+    obj[cleanKey] = value;
+    return;
+  }
+
+  let index = 2;
+  while (`${cleanKey} (${index})` in obj) index++;
+  obj[`${cleanKey} (${index})`] = value;
+}
+
+function mergeMetadata(target, source) {
+  for (const [key, value] of Object.entries(source || {})) {
+    addMetadata(target, key, value);
+  }
+}
+
+function parseJsonLoose(value) {
+  if (value && typeof value === 'object') return value;
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!(trimmed.startsWith('{') || trimmed.startsWith('['))) return null;
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+}
+
+function prettyMaybeJson(value) {
+  if (typeof value !== 'string') return JSON.stringify(value, null, 2);
+  const parsed = parseJsonLoose(value);
+  return parsed ? JSON.stringify(parsed, null, 2) : value;
+}
+
+function formatAsText(item) {
+  const r = item.result;
+  const lines = [
+    `File: ${item.file.name}`,
+    `Format: ${item.detectedType}`,
+    `Generator: ${r.generator || 'Unknown'}`,
+    ''
+  ];
+
+  if (r.positivePrompt) lines.push('POSITIVE PROMPT', r.positivePrompt, '');
+  if (r.negativePrompt) lines.push('NEGATIVE PROMPT', r.negativePrompt, '');
+  if (!r.positivePrompt && r.parametersText) lines.push('PARAMETERS / PROMPT TEXT', r.parametersText, '');
+
+  if (Object.keys(r.details).length) {
+    lines.push('GENERATION DETAILS');
+    for (const [key, value] of Object.entries(r.details)) {
+      lines.push(`${key}: ${formatValue(value)}`);
+    }
+    lines.push('');
+  }
+
+  if (r.loras.length) {
+    lines.push('LORAS');
+    r.loras.forEach((lora, index) => {
+      lines.push(`${index + 1}. ${lora.name}` +
+        (lora.strengthModel != null ? ` | model: ${lora.strengthModel}` : '') +
+        (lora.strengthClip != null ? ` | clip: ${lora.strengthClip}` : ''));
+    });
+    lines.push('');
+  }
+
+  if (Object.keys(r.rawMetadata).length) {
+    lines.push('RAW METADATA');
+    for (const [key, value] of Object.entries(r.rawMetadata)) {
+      lines.push(`--- ${key} ---`);
+      lines.push(typeof value === 'string' ? value : JSON.stringify(value, null, 2));
+    }
+  }
+
+  return lines.join('\n').trim();
+}
+
+async function copyText(text, successMessage) {
+  if (!text) return;
+
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+  }
+
+  setStatus(successMessage, 'good');
+}
+
+function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function setStatus(text, kind = '') {
+  els.statusText.textContent = text;
+  els.statusText.className = 'status' + (kind ? ` ${kind}` : '');
+}
+
+function readU16BE(bytes, offset) {
+  return (bytes[offset] << 8) | bytes[offset + 1];
+}
+
+function readU16LE(bytes, offset) {
+  return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+function readU32BE(bytes, offset) {
+  return ((bytes[offset] * 0x1000000) +
+    ((bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3])) >>> 0;
+}
+
+function readU32LE(bytes, offset) {
+  return (bytes[offset] |
+    (bytes[offset + 1] << 8) |
+    (bytes[offset + 2] << 16) |
+    (bytes[offset + 3] * 0x1000000)) >>> 0;
+}
+
+function ascii(bytes) {
+  let output = '';
+  for (const byte of bytes) output += String.fromCharCode(byte);
+  return output;
+}
+
+function latin1(bytes) {
+  return new TextDecoder('latin1').decode(bytes);
+}
+
+function utf8(bytes) {
+  return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+}
+
+function decodeUtf16Le(bytes) {
+  return new TextDecoder('utf-16le', { fatal: false }).decode(bytes);
+}
+
+function decodeUtf16Be(bytes) {
+  const swapped = new Uint8Array(bytes.length);
+  for (let i = 0; i + 1 < bytes.length; i += 2) {
+    swapped[i] = bytes[i + 1];
+    swapped[i + 1] = bytes[i];
+  }
+  return decodeUtf16Le(swapped);
+}
+
+function decodeBestEffort(bytes) {
+  // Valid UTF-8 wins (prompts are usually UTF-8); otherwise pick the more readable decoding.
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { /* not UTF-8 */ }
+  const utf = utf8(bytes);
+  const lat = latin1(bytes);
+  return printableScore(utf) >= printableScore(lat) ? utf : lat;
+}
+
+function printableScore(text) {
+  if (!text) return 0;
+  let printable = 0;
+  for (const char of text) {
+    const code = char.charCodeAt(0);
+    if (char === '\n' || char === '\r' || char === '\t' || code >= 32) printable++;
+  }
+  return printable / text.length;
+}
+
+function asciiScore(text) {
+  if (!text) return 0;
+  let ascii = 0;
+  for (const char of text) {
+    const code = char.charCodeAt(0);
+    if ((code >= 32 && code < 127) || char === '\n' || char === '\r' || char === '\t') ascii++;
+  }
+  return ascii / text.length;
+}
+
+function looksReadable(text) {
+  return text && text.length >= 3 && printableScore(text) > 0.82;
+}
+
+function decodeXml(text) {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
+function formatValue(value) {
+  if (value === null) return 'null';
+  if (value === undefined) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes)) return '';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let index = 0;
+
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index++;
+  }
+
+  return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function safeBaseName(filename) {
+  return filename.replace(/\.[^.]+$/, '').replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+</script>
+</body>
+</html>
