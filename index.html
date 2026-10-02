@@ -774,11 +774,11 @@ function renderSelected() {
   }
 
   if (r.comfyPromptJson) {
-    html += collapsibleJsonSection('ComfyUI API Prompt JSON', r.comfyPromptJson);
+    html += collapsibleJsonSection('ComfyUI API Prompt JSON', r.comfyPromptJson, 'comfyPromptJson');
   }
 
   if (r.comfyWorkflowJson) {
-    html += collapsibleJsonSection('ComfyUI Workflow JSON', r.comfyWorkflowJson);
+    html += collapsibleJsonSection('ComfyUI Workflow JSON', r.comfyWorkflowJson, 'comfyWorkflowJson');
   }
 
   if (Object.keys(r.rawMetadata).length) {
@@ -799,7 +799,12 @@ function renderSelected() {
   els.content.querySelectorAll('[data-copy-field]').forEach(button => {
     button.addEventListener('click', async () => {
       const field = button.getAttribute('data-copy-field');
-      await copyText(r[field] || '', `${button.dataset.label || 'Text'} copied`);
+      const value = r[field];
+      // JSON sections hold parsed objects; copy them as readable, valid JSON text.
+      const text = button.dataset.format === 'json'
+        ? (typeof value === 'string' ? prettyMaybeJson(value) : JSON.stringify(value, null, 2))
+        : (value || '');
+      await copyText(text, `${button.dataset.label || 'Text'} copied`);
     });
   });
 }
@@ -817,14 +822,17 @@ function promptSection(title, text, field) {
     </section>`;
 }
 
-function collapsibleJsonSection(title, value) {
+function collapsibleJsonSection(title, value, field) {
   const pretty = typeof value === 'string'
     ? prettyMaybeJson(value)
     : JSON.stringify(value, null, 2);
 
   return `
     <section class="section">
-      <div class="section-title"><span>${escapeHtml(title)}</span></div>
+      <div class="section-title">
+        <span>${escapeHtml(title)}</span>
+        <button type="button" data-copy-field="${escapeHtml(field)}" data-format="json" data-label="${escapeHtml(title)}">Copy</button>
+      </div>
       <div class="section-body">
         <details>
           <summary>Show JSON</summary>
